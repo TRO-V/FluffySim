@@ -17,16 +17,9 @@ namespace AnoMech.Windows;
 
 // Logs every zone packet the live dispatcher receives, before the Duty Recorder picks the ones it
 // writes, so packets that never reach a replay can be read from real content. One line per packet:
-// ms since start, opcode, target entity, payload size, payload hex.
+// ms since start, opcode, target entity. Payloads are omitted because this hook provides no length.
 internal sealed unsafe class PacketCaptureDebug : IDisposable
 {
-    // The IPC header in front of the payload; the opcode is its u16 at +2.
-    private const int IpcHeaderSize = 0x10;
-
-    // The packet's length isn't passed in (the u32 before the IPC header reads 0x20 for every
-    // packet), so a fixed span is dumped; shorter packets run on into the next one.
-    private const int DumpBytes = 0x100;
-
     private delegate void OnReceivePacketDelegate(PacketDispatcher* self, uint targetId, byte* packet);
 
     private readonly Hook<OnReceivePacketDelegate> hook;
@@ -70,6 +63,7 @@ internal sealed unsafe class PacketCaptureDebug : IDisposable
     public void Draw()
     {
         ImGui.TextUnformatted("Packet capture (every received zone packet, incl. ones replays skip)");
+        ImGui.TextUnformatted("Metadata only: payload bytes are omitted (length unavailable).");
         ImGui.Separator();
         if (writer == null)
         {
@@ -168,6 +162,7 @@ internal sealed unsafe class PacketCaptureDebug : IDisposable
         path = Path.Combine(dir, $"packets_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
         writer = new StreamWriter(path, false, Encoding.ASCII, 1 << 20);
         writer.WriteLine($"# local player {Plugin.ObjectTable.LocalPlayer?.EntityId:X8}");
+        writer.WriteLine("# packet columns: elapsed_ms opcode target_id; payload omitted (length unavailable)");
         statuses = [];
         conditions.Clear();
         lastPositionMs = -PositionIntervalMs;
@@ -201,12 +196,10 @@ internal sealed unsafe class PacketCaptureDebug : IDisposable
     private void Write(uint targetId, byte* packet)
     {
         var opcode = *(ushort*)(packet + 2);
-        var line = new StringBuilder(32 + DumpBytes * 2);
+        var line = new StringBuilder(32);
         line.Append(clock.ElapsedMilliseconds).Append(' ')
             .Append(opcode.ToString("X4")).Append(' ')
-            .Append(targetId.ToString("X8")).Append(' ');
-        var payload = packet + IpcHeaderSize;
-        for (var i = 0; i < DumpBytes; i++) line.Append(payload[i].ToString("x2"));
+            .Append(targetId.ToString("X8"));
         writer!.WriteLine(line);
         packets++;
     }
