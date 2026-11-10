@@ -5,12 +5,12 @@ using AnoMech.Core.Game.Ai;
 namespace AnoMech.Tests;
 public class DsrP5DeathTests
 {
-    [Test]
-    public void BoundedAssignmentsAndEverySeatClear()
+    [TestCase(0)] [TestCase(1)]
+    public void BoundedAssignmentsAndEverySeatClear(int strategy)
     {
         for (var seed = 0; seed < 24; seed++)
         {
-            var run = ScenarioRun.Execute(typeof(DsrP5DeathScenario), 0, seed + 100, new()
+            var run = ScenarioRun.Execute(typeof(DsrP5DeathScenario), strategy, seed + 100, new()
             { PlayerRole = (PartyRole)(seed % 8), BotDifficulty = seed % 2 == 0 ? BotDifficulty.Easy : BotDifficulty.Hard });
             Assert.That(run.Passed, run.ToString);
         }

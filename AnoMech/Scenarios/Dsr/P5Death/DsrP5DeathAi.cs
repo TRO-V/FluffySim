@@ -11,12 +11,20 @@ namespace AnoMech.Scenarios.Dsr.P5Death;
 
 public sealed class DsrP5DeathAi : IScenarioAi<DsrP5DeathState>
 {
-    public string Name => "Dooms North (2-2, anchored)";
-    public string Group => "Elemental";
+    public string Name => doomsSouth ? "Dooms South (2-2, anchored)" : "Dooms North (2-2, anchored)";
+    public string Group => doomsSouth ? "Mana" : "Elemental";
+
+    private readonly bool doomsSouth;
+
+    public DsrP5DeathAi() : this(false) { }
+
+    public DsrP5DeathAi(bool doomsSouth) => this.doomsSouth = doomsSouth;
 
     private const float D = DsrP5DeathScenario.Death;
     private static readonly PartyRole[] RoleCongaLine =
         [PartyRole.MainTank, PartyRole.OffTank, PartyRole.RegenHealer, PartyRole.ShieldHealer, PartyRole.MeleeDpsA, PartyRole.MeleeDpsB, PartyRole.PhysRangedDps, PartyRole.CasterDps];
+    private static readonly PartyRole[] SouthRoleCongaLine =
+        [PartyRole.MainTank, PartyRole.OffTank, PartyRole.MeleeDpsA, PartyRole.MeleeDpsB, PartyRole.PhysRangedDps, PartyRole.CasterDps, PartyRole.RegenHealer, PartyRole.ShieldHealer];
     private const float CongaSpacing = 1.5f;
     private const float CongaLineA = -2f;
     private const float StepAside = 1.5f;
@@ -35,16 +43,16 @@ public sealed class DsrP5DeathAi : IScenarioAi<DsrP5DeathState>
     {
         state = stateParam;
         world = worldParam;
-        CongaLine = CongaLineWithThePlayerAt(state.PlayerCongaSlot, world.Party.PlayerRole);
+        CongaLine = CongaLineWithThePlayerAt(state.PlayerCongaSlot, world.Party.PlayerRole, doomsSouth);
         var ai = new AiManager(world);
 
         ai.Move(0.3f, () => AiMove.Create(MainTankSouthPartyNorth()).NaturalOrder());
         ai.Move(D + 9.0f, () => AiMove.Create(LineUpFacingTheWarrior()).NaturalOrder(), jitter: 0f);
-        ai.Move(D + 11.9f, () => AiMove.Create(DoomsStepTowardTheWarrior()).NaturalOrder(), jitter: 0f);
+        ai.Move(D + 11.9f, () => AiMove.Create(StepOutOfConga()).NaturalOrder(), jitter: 0f);
         ai.Move(D + 13.5f, () => AiMove.Create(SpreadToDiveSafeSpots()).NaturalOrder(), jitter: 0f, sprint: true);
         ai.Move(DsrP5DeathScenario.LightningLands + 0.08f, () => AiMove.Create(StepOffTwistersAfterLightning()).NaturalOrder(), jitter: 0f, sprint: true);
         ai.Move(DsrP5DeathScenario.Earthquakes[2] + 0.1f, () => AiMove.Create(WallNonDoomsInBehindTheThirdQuake()).NaturalOrder(), jitter: 0f, sprint: true);
-        ai.Move(DsrP5DeathScenario.Earthquakes[3] + 0.07f, () => AiMove.Create(IntercardNonDoomsInBehindTheFourthQuake()).NaturalOrder(), jitter: 0f, sprint: true);
+        ai.Move(DsrP5DeathScenario.Earthquakes[3] + 0.07f, () => AiMove.Create(SouthIntercardsInBehindTheFourthQuake()).NaturalOrder(), jitter: 0f, sprint: true);
         ai.Move(D + 27.0f, () => AiMove.Create(AnchorForKnockback()).NaturalOrder(), jitter: 0f, sprint: true);
         ai.Move(DsrP5DeathScenario.SymbolsMarked + 0.2f, () => AiMove.Create(TakeSymbolSpots()).NaturalOrder(), jitter: 0f, sprint: true);
         world.Events.Add(DsrP5DeathScenario.Knockback - 0.15f, FaceAwayFromBothGazes);
@@ -54,10 +62,11 @@ public sealed class DsrP5DeathAi : IScenarioAi<DsrP5DeathState>
         ai.Move(66.8f, () => AiMove.Create(TankbusterPositions(true)).NaturalOrder(), jitter: 0, sprint: true);
     }
 
-    public static PartyRole[] CongaLineWithThePlayerAt(int? slot, PartyRole player)
+    public static PartyRole[] CongaLineWithThePlayerAt(int? slot, PartyRole player, bool doomsSouth = false)
     {
-        if (slot is not { } at || at is < 0 or > 7) return RoleCongaLine;
-        var line = RoleCongaLine.Where(r => r != player).ToList();
+        var priority = doomsSouth ? SouthRoleCongaLine : RoleCongaLine;
+        if (slot is not { } at || at is < 0 or > 7) return priority;
+        var line = priority.Where(r => r != player).ToList();
         line.Insert(at, player);
         return line.ToArray();
     }
@@ -85,13 +94,13 @@ public sealed class DsrP5DeathAi : IScenarioAi<DsrP5DeathState>
         return spots;
     }
 
-    private Vector2?[] DoomsStepTowardTheWarrior()
+    private Vector2?[] StepOutOfConga()
     {
         var spots = new Vector2?[8];
         for (var i = 0; i < CongaLine.Length; i++)
         {
             var role = CongaLine[i];
-            spots[(int)role] = Local(CongaLineA + (state.IsDoomed(role) ? StepAside : -StepAside), CongaSpacing * (i - 3.5f));
+            spots[(int)role] = Local(CongaLineA + (state.IsDoomed(role) != doomsSouth ? StepAside : -StepAside), CongaSpacing * (i - 3.5f));
         }
         return spots;
     }
@@ -113,7 +122,7 @@ public sealed class DsrP5DeathAi : IScenarioAi<DsrP5DeathState>
         var nonDooms = NonDoomsInLine;
         for (var i = 0; i < nonDooms.Count; i++)
             spots[(int)nonDooms[i]] = IsOuter(i) ? Local(0f, Side(i) * WallRadius) : WarriorFrame(IntercardRadius, 180f - Side(i) * IntercardOffset);
-        return spots;
+        return SwapMiddleSpotsForDoomsSouth(spots);
     }
 
     private Vector2?[] StepOffTwistersAfterLightning()
@@ -125,7 +134,7 @@ public sealed class DsrP5DeathAi : IScenarioAi<DsrP5DeathState>
         var nonDooms = NonDoomsInLine;
         for (var i = 0; i < nonDooms.Count; i++)
             spots[(int)nonDooms[i]] = IsOuter(i) ? Local(-3f, Side(i) * 19.5f) : Local(-16.5f, Side(i) * 10f);
-        return spots;
+        return SwapMiddleSpotsForDoomsSouth(spots);
     }
 
     private Vector2?[] WallNonDoomsInBehindTheThirdQuake()
@@ -137,19 +146,29 @@ public sealed class DsrP5DeathAi : IScenarioAi<DsrP5DeathState>
         return spots;
     }
 
-    private Vector2?[] IntercardNonDoomsInBehindTheFourthQuake()
+    private Vector2?[] SouthIntercardsInBehindTheFourthQuake()
     {
         var spots = new Vector2?[8];
         var nonDooms = NonDoomsInLine;
         for (var i = 0; i < nonDooms.Count; i++)
             if (!IsOuter(i)) spots[(int)nonDooms[i]] = Local(-12f, Side(i) * 10f);
+        return SwapMiddleSpotsForDoomsSouth(spots);
+    }
+
+    private Vector2?[] SwapMiddleSpotsForDoomsSouth(Vector2?[] spots)
+    {
+        if (!doomsSouth) return spots;
+        var dooms = DoomsInLine;
+        var nonDooms = NonDoomsInLine;
+        for (var i = 1; i <= 2; i++)
+            (spots[(int)dooms[i]], spots[(int)nonDooms[i]]) = (spots[(int)nonDooms[i]], spots[(int)dooms[i]]);
         return spots;
     }
 
     private float DoomAnchorBearing(PartyRole doom)
     {
         var i = DoomsInLine.IndexOf(doom);
-        return IsOuter(i) ? Side(i) * 90f : 180f - Side(i) * 45f;
+        return IsOuter(i) ? Side(i) * 90f : doomsSouth ? Side(i) * 45f : 180f - Side(i) * 45f;
     }
 
     private Vector2?[] AnchorForKnockback()
@@ -160,7 +179,7 @@ public sealed class DsrP5DeathAi : IScenarioAi<DsrP5DeathState>
             spots[(int)dooms[i]] = WarriorFrame(IsOuter(i) ? OuterDoomAnchorRadius : AnchorRadius, DoomAnchorBearing(dooms[i]));
         var nonDooms = NonDoomsInLine;
         for (var i = 0; i < nonDooms.Count; i++)
-            spots[(int)nonDooms[i]] = Local(2f, 0.5f * (i - 1.5f));
+            spots[(int)nonDooms[i]] = Local(doomsSouth ? -2f : 2f, 0.5f * (i - 1.5f));
         return spots;
     }
 

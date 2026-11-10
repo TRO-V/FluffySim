@@ -5,7 +5,7 @@ namespace AnoMech.Scenarios.Dsr.P5Death;
 public sealed class DsrP5DeathSettingsWindow
 {
     private static readonly string[] SlotLabels =
-        ["My role's spot (MT ST H1 H2 | D1 D2 D3 D4)", "1 (left end)", "2", "3", "4 (left centre)", "5 (right centre)", "6", "7", "8 (right end)"];
+        ["My role's spot (selected strategy)", "1 (left end)", "2", "3", "4 (left centre)", "5 (right centre)", "6", "7", "8 (right end)"];
 
     public DsrP5DeathStateOverrides Overrides { get; } = new() { PlayerDoom = Plugin.Config?.DsrDeathDoom };
 

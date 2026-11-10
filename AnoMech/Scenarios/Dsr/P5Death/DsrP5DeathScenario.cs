@@ -20,7 +20,7 @@ public sealed class DsrP5DeathScenario : IScenario
     public IPhase Phase => DsrZone.P5;
     public bool IsIncomplete => true;
     public bool EnablePhaseBgm => true;
-    public IReadOnlyList<IScenarioAi> AiStrats => [new DsrP5DeathAi()];
+    public IReadOnlyList<IScenarioAi> AiStrats => [new DsrP5DeathAi(), new DsrP5DeathAi(doomsSouth: true)];
     private readonly DsrP5DeathSettingsWindow settings = new();
     public object SettingsOverrides => settings.Overrides;
     public void DrawSettings() => settings.Draw();
